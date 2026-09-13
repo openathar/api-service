@@ -1,13 +1,21 @@
 # AGENTS.md — api-service
 
-Public REST API der Athar-Plattform (openathar). Spring Boot, Hexagonal,
-wrappt `athan-core-java` (Calculation Engine) + Content-Distribution.
-Rate-limitiert (Redis Token-Bucket), aggressiv gecacht (Ergebnisse für
-lat/lon/date/method sind deterministisch und ewig gültig).
+Public REST API of the Athar platform (openathar). Spring Boot, hexagonal,
+wraps `athan-core-java` (calculation engine) + content distribution.
+Rate-limited (Redis token bucket), aggressively cached (results for
+lat/lon/date/method are deterministic and valid forever).
 
-## Verknuepfungen
-- Architektur/Roadmap: `../../AGENTS.md` (Superproject `business/athar`)
-- Repo-Regeln: `~/Development/harness/agents/business-repo.md`
+## Links
 
-## Sprint-1-Scope (MVP)
-Nur `GET /v1/prayer-times?lat&lon&date&method`. Kein GraphQL in V1.
+- Architecture/roadmap: `../../AGENTS.md` (superproject `business/athar`)
+- Repo conventions: `~/Development/harness/agents/business-repo.md`
+
+## V1 scope
+
+Only `GET /v1/prayer-times?lat&lon&date&method`. No GraphQL in V1.
+
+## Current state
+
+Scaffold only — no code, no endpoint yet, and it depends on
+`athan-core-java` existing first (also currently a scaffold). See the
+superproject's `docs/architecture.md` for the build order and reasoning.
