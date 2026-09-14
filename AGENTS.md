@@ -16,9 +16,19 @@ Only `GET /v1/prayer-times?lat&lon&date&method`. No GraphQL in V1.
 
 ## Current state
 
-Scaffold only — no code, no endpoint yet, and it depends on
-`athan-core-java` existing first (also currently a scaffold). See the
-superproject's `docs/architecture.md` for the build order and reasoning.
+Working V1 endpoint: `GET /v1/prayer-times?lat&lon&date&method&utcOffset`,
+a thin hexagonal wrapper around `athan-core-java` (the single source of
+truth for calculation). Spring Boot 4.1.1, Java 25, Lombok, MapStruct,
+springdoc 3.1.1. Structure per the `spring-boot-conventions` skill:
+`domain/`, `port/in/`, `application/`, `adapter/web/` — no persistence, no
+Modulith. ArchUnit rules enforced in tests.
+
+Not yet implemented (roadmap, not scaffold): Redis rate limiting, HTTP
+caching headers, API keys, content distribution, Qibla/Hijri endpoints.
+`athan-core` must be installed locally first (`mvn install` in `core/`),
+since it is not yet on Maven Central.
+
+Build with `mvn test` (Java 25).
 
 ## APM (Agent Package Manager)
 
