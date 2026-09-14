@@ -10,10 +10,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.LocalDate;
 
 import org.junit.jupiter.api.Test;
+import org.openathar.api.adapter.web.dto.HijriResponse;
 import org.openathar.api.adapter.web.dto.PrayerTimesResponse;
 import org.openathar.api.adapter.web.dto.QiblaResponse;
+import org.openathar.api.domain.HijriDate;
 import org.openathar.api.domain.PrayerTimes;
 import org.openathar.api.domain.Qibla;
+import org.openathar.api.port.in.HijriUseCase;
 import org.openathar.api.port.in.PrayerTimesUseCase;
 import org.openathar.api.port.in.QiblaUseCase;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,7 +25,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-@WebMvcTest({PrayerTimesController.class, QiblaController.class})
+@WebMvcTest({PrayerTimesController.class, QiblaController.class, HijriController.class})
 class CacheHeadersWebMvcTest {
 
     @Autowired
@@ -36,6 +39,10 @@ class CacheHeadersWebMvcTest {
     QiblaUseCase qiblaUseCase;
     @MockitoBean
     QiblaMapper qiblaMapper;
+    @MockitoBean
+    HijriUseCase hijriUseCase;
+    @MockitoBean
+    HijriMapper hijriMapper;
     @MockitoBean
     StringRedisTemplate redis;
 
@@ -61,6 +68,16 @@ class CacheHeadersWebMvcTest {
         when(qiblaMapper.toResponse(any())).thenReturn(new QiblaResponse(52.52, 13.405, 123.4));
 
         mvc.perform(get("/v1/qibla").param("lat", "52.52").param("lon", "13.405"))
+            .andExpect(status().isOk())
+            .andExpect(header().string("Cache-Control", "max-age=31536000, public, immutable"));
+    }
+
+    @Test
+    void hijriSuccessIsCachedImmutable() throws Exception {
+        when(hijriUseCase.convert(any(), any())).thenReturn(new HijriDate(LocalDate.of(2026, 9, 14), 3, 4, 1448, "Rabi' al-thani"));
+        when(hijriMapper.toResponse(any())).thenReturn(new HijriResponse(LocalDate.of(2026, 9, 14), 3, 4, 1448, "Rabi' al-thani"));
+
+        mvc.perform(get("/v1/hijri").param("date", "2026-09-14").param("locale", "en"))
             .andExpect(status().isOk())
             .andExpect(header().string("Cache-Control", "max-age=31536000, public, immutable"));
     }
