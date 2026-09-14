@@ -1,0 +1,20 @@
+{
+  "packages": {
+    "spring-boot-keycloak-integration": {
+      "version": "1.0.0",
+      "sourceCommit": "9cbe1a6",
+      "installedAt": "2026-09-14T19:07:49.311Z",
+      "files": {
+        "SKILL.md": "94529393145e727d67396fbe80bf1497094d15239d388e49c8589eedd6f267fa"
+      }
+    },
+    "test-driven-development": {
+      "version": "1.0.0",
+      "sourceCommit": "9cbe1a6",
+      "installedAt": "2026-09-14T19:07:49.344Z",
+      "files": {
+        "SKILL.md": "7c0c6ac057c19d7f8be65d9f49c3a638703b868f4625c78b70da5439d5d74fca"
+      }
+    }
+  }
+}

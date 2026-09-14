@@ -19,3 +19,10 @@ Only `GET /v1/prayer-times?lat&lon&date&method`. No GraphQL in V1.
 Scaffold only — no code, no endpoint yet, and it depends on
 `athan-core-java` existing first (also currently a scaffold). See the
 superproject's `docs/architecture.md` for the build order and reasoning.
+
+## APM (Agent Package Manager)
+
+Projekt-lokale Skills/Agents/Commands werden über `apm.yaml` verwaltet
+(Registry-Quelle: `~/Development/harness/registry/`).
+- `apm install --local` — installiert die in `apm.yaml` gelisteten Packages
+- `apm status --local` — prüft Installations-Stand gegen die Registry
