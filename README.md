@@ -27,6 +27,16 @@ Returns all prayer times as local `HH:mm` strings, including the Duha
 window (`duhaStart`, `duhaEnd`, `duhaBest`). Invalid input → `400` with an
 `error` message.
 
+### Qibla
+
+```
+GET /v1/qibla?lat={lat}&lon={lon}
+```
+
+Returns the Qibla bearing from true north in degrees
+(`bearingDegrees`), computed for the Kaaba (21.4225241°N, 39.8261818°E).
+Invalid input → `400` with an `error` message.
+
 ## Quick start
 
 ```bash
@@ -34,6 +44,7 @@ window (`duhaStart`, `duhaEnd`, `duhaBest`). Invalid input → `400` with an
 (cd ../core && mvn install -DskipTests)
 mvn spring-boot:run
 curl "http://localhost:8080/v1/prayer-times?lat=52.52&lon=13.405&date=2026-09-14&method=MWL&utcOffset=2"
+curl "http://localhost:8080/v1/qibla?lat=52.52&lon=13.405"
 ```
 
 Swagger UI: `http://localhost:8080/swagger-ui.html` after startup.
