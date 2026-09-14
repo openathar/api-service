@@ -1,10 +1,12 @@
 package org.openathar.api.adapter.web;
 
+import java.time.Duration;
 import java.time.LocalDate;
 
 import org.openathar.api.domain.PrayerTimesQuery;
 import org.openathar.api.port.in.PrayerTimesUseCase;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -31,6 +33,8 @@ public class PrayerTimesController {
             @RequestParam(defaultValue = "MWL") String method,
             @RequestParam(defaultValue = "0") double utcOffset) {
         PrayerTimesQuery query = new PrayerTimesQuery(lat, lon, date, method, utcOffset);
-        return ResponseEntity.ok(mapper.toResponse(useCase.calculate(query)));
+        return ResponseEntity.ok()
+            .cacheControl(CacheControl.maxAge(Duration.ofDays(365)).cachePublic().immutable())
+            .body(mapper.toResponse(useCase.calculate(query)));
     }
 }

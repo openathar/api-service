@@ -24,10 +24,13 @@ per the `spring-boot-conventions` skill: `domain/`, `port/in/`,
 `application/`, `adapter/web/` — no persistence, no Modulith. ArchUnit
 rules enforced in tests.
 
-Not yet implemented (roadmap, not scaffold): Redis rate limiting, HTTP
-caching headers, API keys, content distribution, Hijri endpoint.
-`athan-core` must be installed locally first (`mvn install` in `core/`),
-since it is not yet on Maven Central.
+Implemented: Redis rate limiting (fixed window per client IP, fail-open
+when Redis is unreachable, configurable via `athar.ratelimit.*`) and HTTP
+caching headers (`Cache-Control: public, max-age=31536000, immutable` on
+`/v1/*` 2xx/3xx responses — results are deterministic per lat/lon/date).
+Not yet implemented (roadmap): API keys, content distribution, Hijri
+endpoint. `athan-core` must be installed locally first (`mvn install` in
+`core/`), since it is not yet on Maven Central.
 
 Build with `mvn test` (Java 25).
 

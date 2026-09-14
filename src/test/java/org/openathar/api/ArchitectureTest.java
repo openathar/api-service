@@ -25,5 +25,5 @@ class ArchitectureTest {
     static final ArchRule web_adapter_depends_on_ports_and_application =
         classes().that().resideInAPackage("..adapter.web..").and().haveSimpleNameNotEndingWith("Test")
             .should().onlyDependOnClassesThat()
-            .resideInAnyPackage("..domain..", "..port..", "..application..", "..adapter.web..", "java..", "org.springframework..", "org.mapstruct..");
+            .resideInAnyPackage("..domain..", "..port..", "..application..", "..adapter.web..", "java..", "jakarta..", "org.springframework..", "org.mapstruct..");
 }
