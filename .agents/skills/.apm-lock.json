@@ -15,6 +15,14 @@
       "files": {
         "SKILL.md": "7c0c6ac057c19d7f8be65d9f49c3a638703b868f4625c78b70da5439d5d74fca"
       }
+    },
+    "spring-boot-conventions": {
+      "version": "1.0.0",
+      "sourceCommit": "9cbe1a6",
+      "installedAt": "2026-09-14T21:45:42.604Z",
+      "files": {
+        "SKILL.md": "206f071dc3ec5d8fc22b7b43c6232da827991bfdb956e93a7c162d49ec9c346e"
+      }
     }
   }
 }

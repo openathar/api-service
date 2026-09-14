@@ -1,3 +1,4 @@
 packages:
+  - spring-boot-conventions
   - spring-boot-keycloak-integration
   - test-driven-development
