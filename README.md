@@ -6,10 +6,13 @@ free, rate-limited, built for developers to use. Part of the Athar platform
 
 ## Status
 
-Working V1 endpoint (Spring Boot 4.1.1, Java 25, hexagonal). Rate limiting,
-caching headers, API keys, and the Qibla/Hijri endpoints are roadmap items.
+Working V1 (Spring Boot 4.1.1, Java 25, hexagonal): prayer times, Qibla,
+and Hijri endpoints, with Redis-backed rate limiting and aggressive HTTP
+caching. API keys and content distribution are roadmap items.
 
-## Endpoint
+## Endpoints
+
+### Prayer times
 
 ```
 GET /v1/prayer-times?lat={lat}&lon={lon}&date={date}&method={method}&utcOffset={hours}
@@ -37,14 +40,38 @@ Returns the Qibla bearing from true north in degrees
 (`bearingDegrees`), computed for the Kaaba (21.4225241°N, 39.8261818°E).
 Invalid input → `400` with an `error` message.
 
+### Hijri
+
+```
+GET /v1/hijri?date={date}&locale={locale}
+```
+
+| Param | Required | Default | Notes |
+|---|---|---|---|
+| `date` | no | today | ISO `yyyy-MM-dd` |
+| `locale` | no | `en` | `en` or `ar` — localized month name |
+
+Returns the Hijri date (`day`, `month`, `year`, `monthName`,
+`gregorianDate`). Invalid input → `400` with an `error` message.
+
+## Rate limiting & caching
+
+- **Rate limiting:** Redis-backed fixed window per client IP
+  (`athar.ratelimit.enabled/limit/window-seconds`, env-overridable via
+  `RATELIMIT_*`). Over the limit → `429` with a `Retry-After` header.
+  Fails open when Redis is unreachable — the API never takes itself down
+  because of the limiter.
+- **Caching:** results for a given (lat, lon, date, method) are
+  deterministic and valid forever, so all `/v1/*` 2xx/3xx responses carry
+  `Cache-Control: public, max-age=31536000, immutable`.
+
 ## Quick start
 
 ```bash
-# athan-core is not on Maven Central yet — install locally first
-(cd ../core && mvn install -DskipTests)
 mvn spring-boot:run
 curl "http://localhost:8080/v1/prayer-times?lat=52.52&lon=13.405&date=2026-09-14&method=MWL&utcOffset=2"
 curl "http://localhost:8080/v1/qibla?lat=52.52&lon=13.405"
+curl "http://localhost:8080/v1/hijri?date=2026-09-14&locale=ar"
 ```
 
 Swagger UI: `http://localhost:8080/swagger-ui.html` after startup.
@@ -52,8 +79,8 @@ Swagger UI: `http://localhost:8080/swagger-ui.html` after startup.
 ## Design intent
 
 A thin, hexagonal Spring Boot wrapper around `athan-core-java` (the single
-source of truth for calculation logic — see `docs/decisions/ADR-001` in
-the superproject). Deterministic inputs (lat, lon, date, method) mean
+source of truth for calculation logic — now consumed directly from Maven
+Central). Deterministic inputs (lat, lon, date, method) mean
 deterministic, cacheable outputs — aggressive HTTP caching and a
-Redis-backed rate limiter are planned to do the heavy lifting, not clever
-backend logic. No GraphQL, no user accounts required for this endpoint.
+Redis-backed rate limiter do the heavy lifting, not clever backend logic.
+No GraphQL, no user accounts required for these endpoints.
