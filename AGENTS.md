@@ -29,8 +29,7 @@ when Redis is unreachable, configurable via `athar.ratelimit.*`) and HTTP
 caching headers (`Cache-Control: public, max-age=31536000, immutable` on
 `/v1/*` 2xx/3xx responses — results are deterministic per lat/lon/date).
 Not yet implemented (roadmap): API keys, content distribution.
-`athan-core` must be installed locally first (`mvn install` in `core/`),
-since it is not yet on Maven Central.
+`athan-core` is consumed from Maven Central (`org.openathar:athan-core:0.1.0`).
 
 Build with `mvn test` (Java 25).
 
