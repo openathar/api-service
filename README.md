@@ -1,5 +1,12 @@
 # api-service
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/logo-dark.png" />
+    <img src="docs/logo-light.png" alt="Athar — the word أثر" width="360" />
+  </picture>
+</p>
+
 The public REST API for prayer times, Qibla, and Hijri calendar conversion —
 free, rate-limited, built for developers to use. Part of the Athar platform
 (Sadaqah Jariyah) — see [openathar](https://github.com/openathar).

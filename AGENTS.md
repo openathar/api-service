@@ -35,7 +35,7 @@ Build with `mvn test` (Java 25).
 
 ## APM (Agent Package Manager)
 
-Projekt-lokale Skills/Agents/Commands werden über `apm.yaml` verwaltet
-(Registry-Quelle: `~/Development/harness/registry/`).
-- `apm install --local` — installiert die in `apm.yaml` gelisteten Packages
-- `apm status --local` — prüft Installations-Stand gegen die Registry
+Project-local skills/agents/commands are managed via `apm.yaml`
+(registry source: `~/Development/harness/registry/`).
+- `apm install --local` — installs the packages listed in `apm.yaml`
+- `apm status --local` — checks install state against the registry
