@@ -7,6 +7,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.openathar.api.application.ApiKeyKeys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -15,27 +16,35 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Redis-Fixed-Window-Rate-Limit pro Client-IP. Wird Redis nicht erreicht,
- * laeuft der Request ungehindert durch (fail open) — die API darf nicht
- * ausfallen, nur weil der Redis kurz weg ist.
+ * Redis fixed-window rate limit, keyed by client IP for anonymous requests
+ * or by API key (X-API-Key header, see {@code ApiKeyController}) for a
+ * higher quota. An unrecognized key is treated as anonymous, not rejected
+ * — a typo in a header should never turn into a 401 for a free API. Fails
+ * open when Redis is unreachable: the API never goes down because the
+ * limiter can't reach its store.
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class RateLimitFilter extends OncePerRequestFilter {
 
+    private static final String API_KEY_HEADER = "X-API-Key";
+
     private final StringRedisTemplate redis;
     private final boolean enabled;
-    private final long limit;
+    private final long anonymousLimit;
+    private final long keyedLimit;
     private final long windowSeconds;
 
     public RateLimitFilter(
             StringRedisTemplate redis,
             @Value("${athar.ratelimit.enabled:true}") boolean enabled,
-            @Value("${athar.ratelimit.limit:60}") long limit,
+            @Value("${athar.ratelimit.limit:60}") long anonymousLimit,
+            @Value("${athar.ratelimit.keyed-limit:600}") long keyedLimit,
             @Value("${athar.ratelimit.window-seconds:60}") long windowSeconds) {
         this.redis = redis;
         this.enabled = enabled;
-        this.limit = limit;
+        this.anonymousLimit = anonymousLimit;
+        this.keyedLimit = keyedLimit;
         this.windowSeconds = Math.max(1, windowSeconds);
     }
 
@@ -44,11 +53,20 @@ public class RateLimitFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         if (enabled && request.getRequestURI().startsWith("/v1/")) {
             try {
+                String apiKey = request.getHeader(API_KEY_HEADER);
+                boolean keyed = apiKey != null && !apiKey.isBlank()
+                    && Boolean.TRUE.equals(redis.hasKey(ApiKeyKeys.hash(apiKey)));
+                String identity = keyed ? "key:" + apiKey : "ip:" + request.getRemoteAddr();
+                long limit = keyed ? keyedLimit : anonymousLimit;
+
                 long windowMillis = windowSeconds * 1000L;
-                String key = "athar:ratelimit:" + request.getRemoteAddr() + ":" + (System.currentTimeMillis() / windowMillis);
-                Long count = redis.opsForValue().increment(key);
+                String bucketKey = "athar:ratelimit:" + identity + ":" + (System.currentTimeMillis() / windowMillis);
+                Long count = redis.opsForValue().increment(bucketKey);
                 if (count != null && count == 1) {
-                    redis.expire(key, Duration.ofSeconds(windowSeconds));
+                    redis.expire(bucketKey, Duration.ofSeconds(windowSeconds));
+                }
+                if (keyed) {
+                    redis.opsForValue().increment(ApiKeyKeys.usage(apiKey));
                 }
                 if (count != null && count > limit) {
                     response.setStatus(429);
@@ -58,7 +76,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
                     return;
                 }
             } catch (RuntimeException e) {
-                // Redis nicht erreichbar → nicht blockieren.
+                // Redis unreachable -> do not block.
             }
         }
         chain.doFilter(request, response);

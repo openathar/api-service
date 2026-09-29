@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -48,6 +49,7 @@ public class PrayerTimesController {
         @ApiResponse(responseCode = "400", description = "Invalid parameters, e.g. out-of-range latitude or an unknown method",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
+    @SecurityRequirement(name = "ApiKeyAuth")
     @GetMapping
     public ResponseEntity<?> getPrayerTimes(
             @Parameter(description = "Latitude in decimal degrees.", example = "52.52")

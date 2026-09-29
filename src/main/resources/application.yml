@@ -13,6 +13,7 @@ athar:
   ratelimit:
     enabled: ${RATELIMIT_ENABLED:true}
     limit: ${RATELIMIT_LIMIT:60}
+    keyed-limit: ${RATELIMIT_KEYED_LIMIT:600}
     window-seconds: ${RATELIMIT_WINDOW_SECONDS:60}
 
 management:

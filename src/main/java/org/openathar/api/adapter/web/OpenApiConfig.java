@@ -5,7 +5,9 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.info.License;
+import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
+import io.swagger.v3.oas.models.Components;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -47,6 +49,15 @@ public class OpenApiConfig {
                 .url("https://github.com/openathar"))
             .servers(List.of(
                 new Server().url("https://api.openathar.org").description("Production"),
-                new Server().url("http://localhost:8080").description("Local development")));
+                new Server().url("http://localhost:8080").description("Local development")))
+            .components(new Components()
+                .addSecuritySchemes("ApiKeyAuth", new SecurityScheme()
+                    .type(SecurityScheme.Type.APIKEY)
+                    .in(SecurityScheme.In.HEADER)
+                    .name("X-API-Key")
+                    .description(
+                        "Optional. Get a free key via POST /v1/api-keys, then send it here for a "
+                            + "higher rate limit than anonymous requests. Anonymous requests (no "
+                            + "header) still work.")));
     }
 }

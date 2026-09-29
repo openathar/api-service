@@ -26,7 +26,7 @@ class RateLimitFilterTest {
 
     private RateLimitFilter filter(boolean enabled, long limit, long windowSeconds) {
         when(redis.opsForValue()).thenReturn(ops);
-        return new RateLimitFilter(redis, enabled, limit, windowSeconds);
+        return new RateLimitFilter(redis, enabled, limit, limit * 10, windowSeconds);
     }
 
     @Test
@@ -92,5 +92,36 @@ class RateLimitFilterTest {
 
         assertEquals(200, response.getStatus());
         verify(ops, never()).increment(anyString());
+    }
+
+    @Test
+    void unknownApiKeyFallsBackToAnonymousLimit() throws Exception {
+        when(redis.hasKey(anyString())).thenReturn(false);
+        when(ops.increment(anyString())).thenReturn(1L);
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/v1/prayer-times");
+        request.addHeader("X-API-Key", "ath_does-not-exist");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter(true, 60, 60).doFilter(request, response, chain);
+
+        assertEquals(200, response.getStatus());
+        verify(ops, never()).increment("athar:apikey:usage:ath_does-not-exist");
+    }
+
+    @Test
+    void knownApiKeyUsesKeyedLimitAndBumpsUsage() throws Exception {
+        when(redis.hasKey("athar:apikey:ath_valid")).thenReturn(true);
+        when(ops.increment(anyString())).thenReturn(500L);
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/v1/prayer-times");
+        request.addHeader("X-API-Key", "ath_valid");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        // limit=60 -> keyedLimit=600, so 500 stays under the keyed limit even though it's over the anonymous one.
+        filter(true, 60, 60).doFilter(request, response, chain);
+
+        assertEquals(200, response.getStatus());
+        verify(ops).increment("athar:apikey:usage:ath_valid");
     }
 }

@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -47,6 +48,7 @@ public class HijriController {
         @ApiResponse(responseCode = "400", description = "Invalid parameters, e.g. a malformed date",
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
+    @SecurityRequirement(name = "ApiKeyAuth")
     @GetMapping
     public ResponseEntity<?> getHijri(
             @Parameter(description = "Date in ISO-8601 (yyyy-MM-dd). Defaults to today.", example = "2026-09-14")
