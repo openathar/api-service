@@ -35,7 +35,8 @@ GET /v1/prayer-times?lat={lat}&lon={lon}&date={date}&method={method}&utcOffset={
 
 Returns all prayer times as local `HH:mm` strings, including the Duha
 window (`duhaStart`, `duhaEnd`, `duhaBest`). Invalid input → `400` with an
-`error` message.
+`{"error": "..."}` body (same shape for every endpoint, including missing
+or malformed parameters).
 
 ### Qibla
 
@@ -81,7 +82,10 @@ curl "http://localhost:8080/v1/qibla?lat=52.52&lon=13.405"
 curl "http://localhost:8080/v1/hijri?date=2026-09-14&locale=ar"
 ```
 
-Swagger UI: `http://localhost:8080/swagger-ui.html` after startup.
+Interactive API docs (Swagger UI, branded with description/examples/error
+schema): `http://localhost:8080/swagger-ui.html` after startup, or
+`https://api.openathar.org/swagger-ui.html` in production. Raw OpenAPI 3.1
+spec: `/v3/api-docs`.
 
 ## Design intent
 
