@@ -82,6 +82,21 @@ class CacheHeadersWebMvcTest {
             .andExpect(header().string("Cache-Control", "max-age=31536000, public, immutable"));
     }
 
+    /**
+     * Ohne `date` liefert der Endpunkt "heute" — das darf nicht ein Jahr lang
+     * als immutable im Browser/CDN liegen, sonst bleibt das Datum vom ersten
+     * Abruf stehen. Kurz cachen (5 min) reicht gegen Lastspitzen.
+     */
+    @Test
+    void hijriTodayIsOnlyCachedBriefly() throws Exception {
+        when(hijriUseCase.convert(any(), any())).thenReturn(new HijriDate(LocalDate.of(2026, 9, 14), 3, 4, 1448, "Rabi' al-thani"));
+        when(hijriMapper.toResponse(any())).thenReturn(new HijriResponse(LocalDate.of(2026, 9, 14), 3, 4, 1448, "Rabi' al-thani"));
+
+        mvc.perform(get("/v1/hijri").param("locale", "en"))
+            .andExpect(status().isOk())
+            .andExpect(header().string("Cache-Control", "max-age=300, public"));
+    }
+
     @Test
     void badRequestIsNotCached() throws Exception {
         mvc.perform(get("/v1/qibla").param("lat", "999").param("lon", "13"))

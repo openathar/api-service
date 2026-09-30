@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class ApiKeyService implements ApiKeyUseCase {
 
+    static final int MAX_LABEL_LENGTH = 64;
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final StringRedisTemplate redis;
@@ -34,6 +35,11 @@ public class ApiKeyService implements ApiKeyUseCase {
     @Override
     public ApiKey issue(String label) {
         String safeLabel = (label == null || label.isBlank()) ? "unlabeled" : label.trim();
+        // Keys are issued anonymously; an unbounded label would be a free way
+        // to fill Redis. 64 chars is plenty for "app or project name".
+        if (safeLabel.length() > MAX_LABEL_LENGTH) {
+            throw new IllegalArgumentException("label too long: max " + MAX_LABEL_LENGTH + " characters");
+        }
         String value = "ath_" + randomToken();
         Instant createdAt = Instant.now();
         redis.opsForHash().putAll(ApiKeyKeys.hash(value), Map.of(

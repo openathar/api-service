@@ -7,7 +7,7 @@ import java.time.Instant;
 @Schema(description = "A freshly issued API key. Shown once — store it yourself, Athar cannot show it to you again.")
 public record ApiKeyResponse(
         @Schema(description = "The API key. Send it as the `X-API-Key` header on /v1/* requests for a higher rate limit.",
-            example = "ath_9f2a1c7e4b3d6f8091a2b3c4d5e6f708")
+            example = "ath_x7Kp2mQ9vLr4TnW8bYc3HdF6jZs1Ne5A")
         String apiKey,
         @Schema(example = "my-prayer-widget") String label,
         Instant createdAt) {

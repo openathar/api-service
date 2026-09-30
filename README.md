@@ -35,9 +35,11 @@ GET /v1/prayer-times?lat={lat}&lon={lon}&date={date}&method={method}&utcOffset={
 | `utcOffset` | no | `0` | Location's UTC offset in hours (−12..14), used to render local wall-clock times |
 
 Returns all prayer times as local `HH:mm` strings, including the Duha
-window (`duhaStart`, `duhaEnd`, `duhaBest`). Invalid input → `400` with an
-`{"error": "..."}` body (same shape for every endpoint, including missing
-or malformed parameters).
+window (`duhaStart`, `duhaEnd`, `duhaBest`). At high latitudes, when the sun
+does not sink far enough for Fajr/Isha, both are placed by the
+middle-of-the-night rule. Where an event does not occur at all (polar day or
+night) its field is `null` — never a made-up time; `dhuhr` is always present.
+Invalid input → `400` with an `{"error": "..."}` body (see *Errors*).
 
 ### Qibla
 
@@ -58,10 +60,12 @@ GET /v1/hijri?date={date}&locale={locale}
 | Param | Required | Default | Notes |
 |---|---|---|---|
 | `date` | no | today | ISO `yyyy-MM-dd` |
-| `locale` | no | `en` | `en` or `ar` — localized month name |
+| `locale` | no | `en` | `en`, `ar` or `de` (same transliteration as `en`) — localized month name |
 
-Returns the Hijri date (`day`, `month`, `year`, `monthName`,
-`gregorianDate`). Invalid input → `400` with an `error` message.
+Returns the Hijri (Umm al-Qura) date (`day`, `month`, `year`, `monthName`,
+`gregorianDate`). Without `date` it converts today (UTC). Supported range is
+the JDK's Umm al-Qura table, 1882-11-12 to 2174-11-25; dates outside →
+`400`. Invalid input → `400` with an `error` message.
 
 ### API keys
 
@@ -71,7 +75,7 @@ GET  /v1/api-keys/{apiKey}/usage      — look up label/created-at/request count
 ```
 
 No email, no account: `POST` with an optional `{"label": "..."}` body
-returns `{"apiKey", "label", "createdAt"}` — **the key is shown only in
+(max 64 characters, defaults to `unlabeled`) returns `{"apiKey", "label", "createdAt"}` — **the key is shown only in
 this response**, store it yourself. Send it back as the `X-API-Key` header
 on any `/v1/*` request for a higher rate limit than anonymous requests get
 (see below). An unrecognized key is treated as anonymous, not rejected —
@@ -86,9 +90,22 @@ Athar never 401s a free API over a typo'd header.
   keyed). Over the limit → `429` with a `Retry-After` header. Fails open
   when Redis is unreachable — the API never takes itself down because of
   the limiter.
-- **Caching:** results for a given (lat, lon, date, method) are
-  deterministic and valid forever, so all `/v1/*` 2xx/3xx responses carry
-  `Cache-Control: public, max-age=31536000, immutable`.
+- **Caching:** calculation results for a given input are deterministic and
+  valid forever, so successful prayer-times, Qibla and Hijri responses carry
+  `Cache-Control: public, max-age=31536000, immutable` — except `/v1/hijri`
+  without a `date`, which means "today" and is cached for 5 minutes. The
+  API-key endpoints are not cached. Cached responses never reach the API, so
+  they count neither against the rate limit nor towards a key's usage.
+
+## Errors
+
+Every error on every endpoint has the same shape, `{"error": "..."}` —
+missing or malformed parameters, out-of-range values, unknown methods,
+unknown paths (`404`), wrong HTTP methods (`405`), wrong content types
+(`415`), malformed JSON, rate limiting (`429`) and unexpected failures
+(`500`, message deliberately generic). The one exception is a CORS
+rejection (`403`), which is written before any controller runs; browsers
+don't expose its body to scripts anyway.
 
 ## Quick start
 
@@ -99,7 +116,8 @@ curl "http://localhost:8080/v1/qibla?lat=52.52&lon=13.405"
 curl "http://localhost:8080/v1/hijri?date=2026-09-14&locale=ar"
 
 # Optional: issue a free API key for a higher rate limit
-KEY=$(curl -s -X POST http://localhost:8080/v1/api-keys -d '{"label":"my-app"}' | jq -r .apiKey)
+KEY=$(curl -s -X POST http://localhost:8080/v1/api-keys \
+  -H "Content-Type: application/json" -d '{"label":"my-app"}' | jq -r .apiKey)
 curl -H "X-API-Key: $KEY" "http://localhost:8080/v1/qibla?lat=52.52&lon=13.405"
 curl "http://localhost:8080/v1/api-keys/$KEY/usage"
 ```

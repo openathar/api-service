@@ -42,7 +42,11 @@ public class PrayerTimesController {
             Returns Fajr, Dhuhr, Asr, Maghrib and Isha — plus sunrise, sunset, \
             midnight and the Duha window — as local HH:mm wall-clock strings \
             for the given location, date and calculation method. Deterministic \
-            for a given input: safe to cache forever (see `Cache-Control`).""")
+            for a given input: safe to cache forever (see `Cache-Control`). \
+            At high latitudes, when the sun does not sink far enough for Fajr \
+            or Isha, both are placed by the middle-of-the-night rule. Where an \
+            event does not occur at all (polar day or night), its field is \
+            `null` instead of a made-up time.""")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Prayer times calculated successfully",
             content = @Content(schema = @Schema(implementation = PrayerTimesResponse.class))),

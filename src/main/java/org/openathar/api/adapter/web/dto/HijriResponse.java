@@ -8,7 +8,7 @@ import java.time.LocalDate;
 public record HijriResponse(
         @Schema(description = "The Gregorian date that was converted.", example = "2026-09-14") LocalDate gregorianDate,
         @Schema(description = "Day of the Hijri month (1-30).", example = "3") int day,
-        @Schema(description = "Hijri month number (1-12).", example = "3") int month,
+        @Schema(description = "Hijri month number (1-12).", example = "4") int month,
         @Schema(description = "Hijri year.", example = "1448") int year,
-        @Schema(description = "Localized Hijri month name (see `locale`).", example = "Rabi' al-awwal") String monthName) {
+        @Schema(description = "Localized Hijri month name (see `locale`).", example = "Rabi' al-thani") String monthName) {
 }
