@@ -12,7 +12,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 
+import org.openathar.api.adapter.web.dto.BatchPrayerTimesRequest;
+import org.openathar.api.adapter.web.dto.BatchPrayerTimesResponse;
 import org.openathar.api.adapter.web.dto.ErrorResponse;
+import org.openathar.api.domain.BatchLocation;
 import org.openathar.api.adapter.web.dto.NextPrayerResponse;
 import org.openathar.api.adapter.web.dto.NextPrayerResponse.PrayerEventResponse;
 import org.openathar.api.adapter.web.dto.PrayerTimesRangeResponse;
@@ -26,6 +29,8 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -156,5 +161,41 @@ public class PrayerTimesController {
 
     private static PrayerEventResponse event(PrayerEvent e) {
         return new PrayerEventResponse(e.name(), e.date(), e.time());
+    }
+
+    @Operation(
+        summary = "Prayer times for many locations",
+        description = """
+            One date and method, up to 50 locations, one request — for mosque \
+            directories, dashboards and multi-city widgets that would otherwise \
+            spend one request per place. Results come back in request order, each \
+            with the `label` you sent. The whole call is rejected if any location \
+            is invalid; the message names its index. Not cached (POST).""")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Prayer times per location",
+            content = @Content(schema = @Schema(implementation = BatchPrayerTimesResponse.class))),
+        @ApiResponse(responseCode = "400", description = "Missing date or locations, more than 50 locations, or an invalid location",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    @SecurityRequirement(name = "ApiKeyAuth")
+    @PostMapping("/batch")
+    public ResponseEntity<BatchPrayerTimesResponse> batch(@RequestBody BatchPrayerTimesRequest request) {
+        if (request.date() == null) throw new IllegalArgumentException("date is required");
+        if (request.locations() == null) throw new IllegalArgumentException("locations is required");
+        String method = request.method() == null || request.method().isBlank() ? "MWL" : request.method();
+        var locations = new java.util.ArrayList<BatchLocation>();
+        for (int i = 0; i < request.locations().size(); i++) {
+            var l = request.locations().get(i);
+            if (l == null || l.lat() == null || l.lon() == null) {
+                throw new IllegalArgumentException("locations[" + i + "]: lat and lon are required");
+            }
+            locations.add(new BatchLocation(l.label(), l.lat(), l.lon(), l.utcOffset() == null ? 0 : l.utcOffset()));
+        }
+        var times = useCase.batch(locations, request.date(), method);
+        var results = new java.util.ArrayList<BatchPrayerTimesResponse.Result>();
+        for (int i = 0; i < times.size(); i++) {
+            results.add(new BatchPrayerTimesResponse.Result(locations.get(i).label(), mapper.toResponse(times.get(i))));
+        }
+        return ResponseEntity.ok().body(new BatchPrayerTimesResponse(request.date(), times.isEmpty() ? method : times.get(0).method(), results));
     }
 }

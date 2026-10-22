@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.function.LongFunction;
 import java.util.stream.Collectors;
 
+import org.openathar.api.domain.BatchLocation;
 import org.openathar.api.domain.NextPrayer;
 import org.openathar.api.domain.PrayerEvent;
 import org.openathar.api.domain.PrayerTimes;
@@ -89,6 +90,27 @@ public class PrayerTimesService implements PrayerTimesUseCase {
             days.add(calculate(new PrayerTimesQuery(lat, lon, d, method, utcOffsetHours)));
         }
         return new PrayerTimesRange(from, to, parseMethod(method).name(), lat, lon, utcOffsetHours, days);
+    }
+
+    /** Upper bound per call: keeps one request cheap enough to count as one against the rate limit. */
+    static final int MAX_BATCH = 50;
+
+    @Override
+    public List<PrayerTimes> batch(List<BatchLocation> locations, LocalDate date, String method) {
+        if (locations == null || locations.isEmpty()) throw new IllegalArgumentException("locations must not be empty");
+        if (locations.size() > MAX_BATCH) {
+            throw new IllegalArgumentException("too many locations: " + locations.size() + " (max " + MAX_BATCH + ")");
+        }
+        List<PrayerTimes> out = new ArrayList<>();
+        for (int i = 0; i < locations.size(); i++) {
+            BatchLocation l = locations.get(i);
+            try {
+                out.add(calculate(new PrayerTimesQuery(l.latitude(), l.longitude(), date, method, l.utcOffsetHours())));
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("locations[" + i + "]: " + e.getMessage());
+            }
+        }
+        return out;
     }
 
     @Override

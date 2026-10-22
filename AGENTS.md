@@ -12,23 +12,40 @@ lat/lon/date/method are deterministic and valid forever).
 
 ## V1 scope
 
-`GET /v1/prayer-times?lat&lon&date&method&utcOffset`,
-`GET /v1/qibla?lat&lon` and `GET /v1/hijri?date&locale`. Roadmap items shipped on top: `GET /v1/prayer-times/range` (from/to, max 62 days), `GET /v1/prayer-times/next` (current/next prayer; uncached without `at`) and `GET /v1/methods` (method catalogue, built from the athan-core enum). No GraphQL in V1.
+15 endpoints, all under `/v1`:
+
+- Prayer times: `GET /prayer-times`, `GET /prayer-times/range` (from/to, max
+  62 days), `GET /prayer-times/next` (current/next prayer; `no-store` without
+  `at`), `POST /prayer-times/batch` (max 50 locations), `GET /prayer-times.ics`
+  (iCalendar feed), `GET /methods` (catalogue, built from the athan-core enum).
+- `GET /qibla`, `GET /hijri`, `GET /calendar/hijri` (month grid),
+  `GET /calendar/gregorian` (reverse conversion), `GET /events` (observances
+  with countdowns), `GET /moon` (Meeus true new/full moon).
+- `GET /places` — city lookup over a bundled GeoNames `cities15000` extract
+  (CC BY 4.0, attribution in every response, see
+  `src/main/resources/places/README.md`; no external geocoder).
+- `POST /api-keys`, `GET /api-keys/{key}/usage`.
+
+Still open: Qur'an/Adhkar content (needs a licence-clean text source — a
+product decision, not an implementation detail). No GraphQL in V1.
 
 ## Current state
 
-Working V1 endpoints: prayer times and Qibla, thin hexagonal wrappers
-around `athan-core-java` (the single source of truth for calculation).
-Spring Boot 4.1.1, Java 25, Lombok, MapStruct, springdoc 3.1.1. Structure
-per the `spring-boot-conventions` skill: `domain/`, `port/in/`,
-`application/`, `adapter/web/` — no persistence, no Modulith. ArchUnit
-rules enforced in tests.
+Thin hexagonal wrappers around `athan-core-java` (the single source of truth
+for calculation); moon, events, places and the ICS feed live in
+`application/` as pure services with unit tests (USNO reference times for the
+moon). Spring Boot 4.1.1, Java 25, Lombok, MapStruct, springdoc 3.1.1.
+Structure per the `spring-boot-conventions` skill: `domain/`, `port/in/`,
+`application/`, `adapter/web/` — no persistence, no Modulith. ArchUnit rules
+enforced in tests.
 
 Implemented: Redis rate limiting (fixed window per client IP, fail-open
 when Redis is unreachable, configurable via `athar.ratelimit.*`) and HTTP
 caching headers (`Cache-Control: public, max-age=31536000, immutable` on
-`/v1/*` 2xx/3xx responses — results are deterministic per lat/lon/date).
-Not yet implemented (roadmap): API keys, content distribution.
+deterministic `/v1/*` responses; answers that mean "now" — `next`, `moon`
+without `at`, `events`/`.ics` without `from` — are `no-store` or 1 hour, see
+the README).
+API keys are implemented (Redis-backed). Not yet implemented: content distribution.
 `athan-core` is consumed from Maven Central (`org.openathar:athan-core:0.1.0`).
 
 Build with `mvn test` (Java 25).

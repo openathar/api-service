@@ -6,7 +6,13 @@ import java.time.temporal.ChronoField;
 import java.time.temporal.TemporalAdjusters;
 import java.time.temporal.ValueRange;
 
+import java.time.DateTimeException;
+import java.time.chrono.HijrahDate;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.openathar.api.domain.HijriDate;
+import org.openathar.api.domain.HijriMonth;
 import org.openathar.api.port.in.HijriUseCase;
 import org.springframework.stereotype.Service;
 
@@ -37,5 +43,34 @@ public class HijriService implements HijriUseCase {
         org.openathar.core.HijriDate h = org.openathar.core.Hijri.gregorianToHijri(date);
         return new HijriDate(date, h.day(), h.month(), h.year(),
             org.openathar.core.Hijri.monthName(h.month(), locale));
+    }
+
+    @Override
+    public HijriMonth month(int year, int month, String locale) {
+        if (month < 1 || month > 12) throw new IllegalArgumentException("month must be 1-12: " + month);
+        HijrahDate first = hijrah(year, month, 1);
+        int length = first.lengthOfMonth();
+        List<HijriMonth.Day> days = new ArrayList<>();
+        for (int d = 1; d <= length; d++) {
+            LocalDate g = LocalDate.from(hijrah(year, month, d));
+            days.add(new HijriMonth.Day(d, g, g.getDayOfWeek()));
+        }
+        return new HijriMonth(year, month, org.openathar.core.Hijri.monthName(month, locale), length, days);
+    }
+
+    @Override
+    public HijriDate toGregorian(int year, int month, int day, String locale) {
+        if (month < 1 || month > 12) throw new IllegalArgumentException("month must be 1-12: " + month);
+        LocalDate g = LocalDate.from(hijrah(year, month, day));
+        return new HijriDate(g, day, month, year, org.openathar.core.Hijri.monthName(month, locale));
+    }
+
+    private static HijrahDate hijrah(int year, int month, int day) {
+        try {
+            return HijrahChronology.INSTANCE.date(year, month, day);
+        } catch (DateTimeException e) {
+            throw new IllegalArgumentException("not a valid Umm al-Qura date: " + year + "-" + month + "-" + day
+                + " (supported years: " + (int) YEARS.getMinimum() + " to " + (int) YEARS.getMaximum() + ")");
+        }
     }
 }

@@ -7,16 +7,20 @@
   </picture>
 </p>
 
-The public REST API for prayer times, Qibla, and Hijri calendar conversion —
-free, rate-limited, built for developers to use. Part of the Athar platform
+The public REST API for prayer times, Qibla, the Hijri calendar, Islamic
+observances, the moon and city lookup — free, rate-limited, built for
+developers to use. Part of the Athar platform
 (Sadaqah Jariyah) — see [openathar](https://github.com/openathar).
 
 ## Status
 
-Working V1 (Spring Boot 4.1.1, Java 25, hexagonal): prayer times, Qibla,
-and Hijri endpoints, with Redis-backed rate limiting, aggressive HTTP
-caching, and free self-serve API keys for a higher rate limit. Content
-distribution is the remaining roadmap item.
+Working V1 (Spring Boot 4.1.1, Java 25, hexagonal) with 15 endpoints: prayer
+times (single day, date range, batch, current/next prayer, iCalendar feed),
+the calculation-method catalogue, Qibla, Hijri conversion in both directions
+plus month grids, Islamic observances with countdowns, moon phase, and city
+lookup — with Redis-backed rate limiting, aggressive HTTP caching, and free
+self-serve API keys for a higher rate limit. The one remaining roadmap item
+is Qur'an and Adhkar content, which waits on a licence-clean text source.
 
 ## Endpoints
 
@@ -67,6 +71,82 @@ Returns the Hijri (Umm al-Qura) date (`day`, `month`, `year`, `monthName`,
 the JDK's Umm al-Qura table, 1882-11-12 to 2174-11-25; dates outside →
 `400`. Invalid input → `400` with an `error` message.
 
+### Prayer times: ranges, batches, the next prayer, a calendar feed
+
+```
+GET  /v1/prayer-times/range?lat&lon&from&to&method&utcOffset
+GET  /v1/prayer-times/next?lat&lon&method&utcOffset&at
+POST /v1/prayer-times/batch
+GET  /v1/prayer-times.ics?lat&lon&from&days&method&utcOffset&lang&sunrise
+GET  /v1/methods
+```
+
+- **`range`** — every day from `from` to `to` (inclusive, at most **62 days**) in
+  one call; each entry has exactly the shape of the single-day response.
+  A longer range or `to` before `from` → `400`.
+- **`next`** — which prayer is current, which is next, and `secondsUntilNext`.
+  Rolls over midnight (before Fajr the current prayer is yesterday's Isha,
+  after Isha the next one is tomorrow's Fajr) and skips prayers that do not
+  occur at the location. `at` (ISO-8601 instant, default now) answers for any
+  moment.
+- **`batch`** — body `{"date", "method"?, "locations": [{"label"?, "lat", "lon", "utcOffset"?}]}`,
+  at most **50 locations**; results come back in request order with the
+  label you sent. One invalid location rejects the whole call and the message
+  names its index (`locations[3]: …`).
+- **`prayer-times.ics`** — an iCalendar feed (`text/calendar`) to subscribe to
+  from Apple Calendar, Google Calendar or Outlook: one short event per prayer
+  (plus sunrise with `sunrise=true`), `days` days (default 30, max 62) from
+  `from` (default today). Times are UTC, so they are right on every device.
+  `lang` is `en`, `de` or `ar`.
+- **`methods`** — the catalogue behind the `method` parameter: id, authority
+  name, Fajr angle, Isha and Maghrib rule (angle or minutes), midnight rule.
+  Generated from the `athan-core` enum, so it cannot drift from what is
+  calculated.
+
+### Hijri calendar and observances
+
+```
+GET /v1/calendar/hijri?year&month&locale       — one Hijri month, day by day
+GET /v1/calendar/gregorian?year&month&day&locale — Hijri → Gregorian
+GET /v1/events?from&count&locale               — upcoming observances with countdowns
+```
+
+`calendar/hijri` returns the month with the Gregorian date and weekday of
+every day; `calendar/gregorian` is the reverse of `/v1/hijri` (same response
+shape). Both cover 1300–1600 AH, the span of the Umm al-Qura table. `events`
+lists the next `count` (1–20) of: Islamic New Year, Ashura, Mawlid, start of
+Ramadan, Laylat al-Qadr, Eid al-Fitr and Eid al-Adha, with Hijri and
+Gregorian date and `daysUntil`. These are calendar facts — a local moon
+sighting can differ by a day. Mawlid is a date, not a call to observe it, and
+the night of Laylat al-Qadr is stated as unknown (commonly the 27th).
+
+### Moon
+
+```
+GET /v1/moon?at={instant}
+```
+
+Phase name, illuminated fraction, age in days, and the previous new moon,
+next new moon and next full moon as UTC instants. Computed from the true
+times of new and full moon (Meeus, *Astronomical Algorithms*, ch. 49 — good
+to a couple of minutes; tests check USNO reference times). Astronomy, not a
+moon sighting: a Hijri month begins with the observed crescent.
+
+### Places
+
+```
+GET /v1/places?q={name}&limit={1..25}&date={date}
+```
+
+Resolves a city name (Latin or Arabic script, accent-insensitive; at least 2
+characters) to latitude, longitude, IANA time zone and the **UTC offset on
+`date`, daylight saving included** — exactly the inputs the prayer-time
+endpoints need. Best match first (exact, prefix, contained; larger cities
+first). Runs on a bundled extract of the GeoNames `cities15000` dump (cities
+above 15,000 people), so no query is sent to a third-party geocoder. **Data:
+[GeoNames](https://www.geonames.org/), CC BY 4.0** — every response names it
+in `source`; see `src/main/resources/places/README.md`.
+
 ### API keys
 
 ```
@@ -91,10 +171,13 @@ Athar never 401s a free API over a typo'd header.
   when Redis is unreachable — the API never takes itself down because of
   the limiter.
 - **Caching:** calculation results for a given input are deterministic and
-  valid forever, so successful prayer-times, Qibla and Hijri responses carry
-  `Cache-Control: public, max-age=31536000, immutable` — except `/v1/hijri`
-  without a `date`, which means "today" and is cached for 5 minutes. The
-  API-key endpoints are not cached. Cached responses never reach the API, so
+  valid forever, so successful calculation responses carry
+  `Cache-Control: public, max-age=31536000, immutable`. Exceptions, because
+  their answer depends on the moment: `/v1/hijri` without a `date` ("today",
+  5 minutes), `/v1/events` and `/v1/prayer-times.ics` without `from` (1 hour),
+  `/v1/prayer-times/next` and `/v1/moon` without `at` (`no-store`).
+  `/v1/methods` and `/v1/places` are cached for a day. The batch and the
+  API-key endpoints (POST) are not cached. Cached responses never reach the API, so
   they count neither against the rate limit nor towards a key's usage.
 
 ## Errors
@@ -114,6 +197,16 @@ mvn spring-boot:run
 curl "http://localhost:8080/v1/prayer-times?lat=52.52&lon=13.405&date=2026-09-14&method=MWL&utcOffset=2"
 curl "http://localhost:8080/v1/qibla?lat=52.52&lon=13.405"
 curl "http://localhost:8080/v1/hijri?date=2026-09-14&locale=ar"
+curl "http://localhost:8080/v1/prayer-times/range?lat=52.52&lon=13.405&from=2026-09-14&to=2026-09-20&utcOffset=2"
+curl "http://localhost:8080/v1/prayer-times/next?lat=52.52&lon=13.405&utcOffset=2"
+curl "http://localhost:8080/v1/methods"
+curl "http://localhost:8080/v1/moon"
+curl "http://localhost:8080/v1/events?count=3&locale=de"
+curl "http://localhost:8080/v1/calendar/hijri?year=1448&month=4"
+curl "http://localhost:8080/v1/places?q=berlin"
+curl -o prayer.ics "http://localhost:8080/v1/prayer-times.ics?lat=52.52&lon=13.405&utcOffset=2"
+curl -X POST http://localhost:8080/v1/prayer-times/batch -H "Content-Type: application/json" \
+  -d '{"date":"2026-09-14","locations":[{"label":"berlin","lat":52.52,"lon":13.405,"utcOffset":2}]}'
 
 # Optional: issue a free API key for a higher rate limit
 KEY=$(curl -s -X POST http://localhost:8080/v1/api-keys \
@@ -134,7 +227,8 @@ source of truth for calculation logic — now consumed directly from Maven
 Central). Deterministic inputs (lat, lon, date, method) mean
 deterministic, cacheable outputs — aggressive HTTP caching and a
 Redis-backed rate limiter do the heavy lifting, not clever backend logic.
-No GraphQL, no mandatory user accounts — API keys are free-form tokens for
+City lookup uses a bundled dataset rather than an external geocoder, so a
+query never leaves the server. No GraphQL, no mandatory user accounts — API keys are free-form tokens for
 rate-limit tiering, not an identity system.
 
 API keys are Redis-backed with no TTL — the pragmatic V1 choice given
