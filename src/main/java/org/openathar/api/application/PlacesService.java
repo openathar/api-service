@@ -50,6 +50,9 @@ public class PlacesService implements PlacesUseCase {
             }
             if (best > 0) hits.add(new Hit(r, best));
         }
+        // With a real name match (exact or prefix), mere substring hits in obscure alternative names are noise.
+        int top = hits.stream().mapToInt(Hit::score).max().orElse(0);
+        if (top >= 2) hits.removeIf(h -> h.score() < 2);
         hits.sort(Comparator.comparingInt(Hit::score).reversed().thenComparing((Hit h) -> -h.row().pop()));
         LocalDate day = at != null ? at : LocalDate.now(ZoneOffset.UTC);
         return hits.stream().limit(limit).map(h -> {
