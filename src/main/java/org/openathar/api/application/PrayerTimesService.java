@@ -1,11 +1,23 @@
 package org.openathar.api.application;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
 import java.util.function.LongFunction;
 import java.util.stream.Collectors;
 
+import org.openathar.api.domain.NextPrayer;
+import org.openathar.api.domain.PrayerEvent;
 import org.openathar.api.domain.PrayerTimes;
+import org.openathar.api.domain.PrayerTimesRange;
 import org.openathar.api.domain.PrayerTimesQuery;
 import org.openathar.api.port.in.PrayerTimesUseCase;
 import org.openathar.core.Method;
@@ -20,6 +32,9 @@ import org.springframework.stereotype.Service;
 public class PrayerTimesService implements PrayerTimesUseCase {
 
     private static final long DAY_MILLIS = 86_400_000L;
+    /** Longest range one call may ask for (about two months — covers any monthly calendar). */
+    static final int MAX_RANGE_DAYS = 62;
+    private static final List<String> PRAYERS = List.of("fajr", "dhuhr", "asr", "maghrib", "isha");
 
     @Override
     public PrayerTimes calculate(PrayerTimesQuery query) {
@@ -60,6 +75,68 @@ public class PrayerTimesService implements PrayerTimesUseCase {
             hasDuha ? time.apply(result.duhaStart()) : null,
             hasDuha ? time.apply(result.duhaEnd()) : null,
             hasDuha ? time.apply(result.duhaBest()) : null);
+    }
+
+    @Override
+    public PrayerTimesRange range(double lat, double lon, LocalDate from, LocalDate to, String method, double utcOffsetHours) {
+        if (to.isBefore(from)) throw new IllegalArgumentException("'to' must not be before 'from'");
+        long count = ChronoUnit.DAYS.between(from, to) + 1;
+        if (count > MAX_RANGE_DAYS) {
+            throw new IllegalArgumentException("range too long: " + count + " days (max " + MAX_RANGE_DAYS + ")");
+        }
+        List<PrayerTimes> days = new ArrayList<>();
+        for (LocalDate d = from; !d.isAfter(to); d = d.plusDays(1)) {
+            days.add(calculate(new PrayerTimesQuery(lat, lon, d, method, utcOffsetHours)));
+        }
+        return new PrayerTimesRange(from, to, parseMethod(method).name(), lat, lon, utcOffsetHours, days);
+    }
+
+    @Override
+    public NextPrayer next(double lat, double lon, String method, double utcOffsetHours, Instant at) {
+        // Validate the same way as the other endpoints (throws IllegalArgumentException).
+        new PrayerTimesQuery(lat, lon, LocalDate.EPOCH, method, utcOffsetHours);
+        LocalDateTime now = LocalDateTime.ofInstant(at, ZoneOffset.ofTotalSeconds((int) Math.round(utcOffsetHours * 3600)))
+            .truncatedTo(ChronoUnit.SECONDS);
+        record Slot(String name, LocalDateTime at) {
+        }
+        List<Slot> slots = new ArrayList<>();
+        for (int shift = -1; shift <= 1; shift++) {
+            LocalDate day = now.toLocalDate().plusDays(shift);
+            PrayerTimes t = calculate(new PrayerTimesQuery(lat, lon, day, method, utcOffsetHours));
+            // Times are HH:mm only: a time that is earlier than the one before it
+            // (an Isha past midnight at high latitudes) belongs to the next date.
+            LocalDate date = day;
+            LocalTime prev = null;
+            for (String name : PRAYERS) {
+                String value = switch (name) {
+                    case "fajr" -> t.fajr();
+                    case "dhuhr" -> t.dhuhr();
+                    case "asr" -> t.asr();
+                    case "maghrib" -> t.maghrib();
+                    default -> t.isha();
+                };
+                if (value == null) continue;
+                LocalTime time = LocalTime.parse(value);
+                if (prev != null && time.isBefore(prev)) date = date.plusDays(1);
+                prev = time;
+                slots.add(new Slot(name, LocalDateTime.of(date, time)));
+            }
+        }
+        slots.sort(Comparator.comparing(Slot::at));
+        Slot current = null;
+        Slot next = null;
+        for (Slot s : slots) {
+            if (!s.at().isAfter(now)) current = s;
+            else if (next == null) next = s;
+        }
+        if (current == null || next == null) throw new IllegalStateException("no prayer found around " + now);
+        return new NextPrayer(parseMethod(method).name(), lat, lon, utcOffsetHours, now,
+            event(current.name(), current.at()), event(next.name(), next.at()),
+            Duration.between(now, next.at()).getSeconds());
+    }
+
+    private static PrayerEvent event(String name, LocalDateTime at) {
+        return new PrayerEvent(name, at.toLocalDate(), at.toLocalTime().toString());
     }
 
     private String format(long utcMillis, double utcOffsetHours) {

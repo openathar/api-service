@@ -13,7 +13,7 @@ lat/lon/date/method are deterministic and valid forever).
 ## V1 scope
 
 `GET /v1/prayer-times?lat&lon&date&method&utcOffset`,
-`GET /v1/qibla?lat&lon` and `GET /v1/hijri?date&locale`. No GraphQL in V1.
+`GET /v1/qibla?lat&lon` and `GET /v1/hijri?date&locale`. Roadmap items shipped on top: `GET /v1/prayer-times/range` (from/to, max 62 days), `GET /v1/prayer-times/next` (current/next prayer; uncached without `at`) and `GET /v1/methods` (method catalogue, built from the athan-core enum). No GraphQL in V1.
 
 ## Current state
 

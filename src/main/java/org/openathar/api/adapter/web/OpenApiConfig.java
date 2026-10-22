@@ -33,7 +33,7 @@ public class OpenApiConfig {
                         + "given input and cached forever by clients and CDNs "
                         + "(`Cache-Control: public, max-age=31536000, immutable`) — except "
                         + "`/v1/hijri` without a `date`, which means \"today\" and is cached for "
-                        + "5 minutes. Every error, on every endpoint, has the same shape: "
+                        + "5 minutes, and `/v1/prayer-times/next` without an `at`, which answers for \"now\" and is not cached. Every error, on every endpoint, has the same shape: "
                         + "`{\"error\": \"...\"}`. "
                         + "Calculations are powered by "
                         + "[athan-core-java](https://github.com/openathar/athan-core-java), the "
