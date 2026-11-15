@@ -232,7 +232,11 @@ query never leaves the server. No GraphQL, no mandatory user accounts — API ke
 rate-limit tiering, not an identity system.
 
 API keys are Redis-backed with no TTL — the pragmatic V1 choice given
-Redis was already the only stateful dependency in this service. Once
-Postgres (via CNPG) lands for user-sync data (Khatma/Tasbeeh), API keys
-are the first candidate to move over for durability guarantees Redis
-doesn't give (e.g. surviving a full data wipe, not just a restart).
+Redis was already the only stateful dependency in this service. Redis is
+the only copy of the keys, so production runs it with AOF persistence
+(`appendfsync everysec`) on a small volume (`athar-ops`,
+`clusters/prod/athar/redis.yaml`): keys survive a pod restart, losing at
+most the last ~1 s of writes. They do **not** survive losing that volume
+(the node's local disk) — there is no backup. Once Postgres (via CNPG)
+lands for user-sync data (Khatma/Tasbeeh), API keys are the first
+candidate to move over for proper durability and backups.
