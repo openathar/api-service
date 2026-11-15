@@ -68,6 +68,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 if (keyed) {
                     redis.opsForValue().increment(ApiKeyKeys.usage(apiKey));
                 }
+                if (count != null) {
+                    response.setHeader("X-RateLimit-Limit", String.valueOf(limit));
+                    response.setHeader("X-RateLimit-Remaining", String.valueOf(Math.max(0, limit - count)));
+                }
                 if (count != null && count > limit) {
                     response.setStatus(429);
                     response.setHeader("Retry-After", String.valueOf(windowSeconds));
