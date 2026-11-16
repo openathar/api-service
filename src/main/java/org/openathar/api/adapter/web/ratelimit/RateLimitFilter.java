@@ -1,6 +1,7 @@
 package org.openathar.api.adapter.web.ratelimit;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.time.Duration;
 
 import jakarta.servlet.FilterChain;
@@ -16,7 +17,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Redis fixed-window rate limit, keyed by client IP for anonymous requests
+ * Redis fixed-window rate limit, keyed by client IP (see {@link #clientIp}) for anonymous requests
  * or by API key (X-API-Key header, see {@code ApiKeyController}) for a
  * higher quota. An unrecognized key is treated as anonymous, not rejected
  * — a typo in a header should never turn into a 401 for a free API. Fails
@@ -34,18 +35,52 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private final long anonymousLimit;
     private final long keyedLimit;
     private final long windowSeconds;
+    private final String clientIpHeader;
 
     public RateLimitFilter(
             StringRedisTemplate redis,
             @Value("${athar.ratelimit.enabled:true}") boolean enabled,
             @Value("${athar.ratelimit.limit:60}") long anonymousLimit,
             @Value("${athar.ratelimit.keyed-limit:600}") long keyedLimit,
-            @Value("${athar.ratelimit.window-seconds:60}") long windowSeconds) {
+            @Value("${athar.ratelimit.window-seconds:60}") long windowSeconds,
+            @Value("${athar.ratelimit.client-ip-header:CF-Connecting-IP}") String clientIpHeader) {
+        this.clientIpHeader = clientIpHeader == null ? "" : clientIpHeader.trim();
         this.redis = redis;
         this.enabled = enabled;
         this.anonymousLimit = anonymousLimit;
         this.keyedLimit = keyedLimit;
         this.windowSeconds = Math.max(1, windowSeconds);
+    }
+
+    /**
+     * The visitor's address. Behind the Cloudflare tunnel every request reaches this service from
+     * the same proxy address, so {@code getRemoteAddr()} alone would put all anonymous visitors
+     * into ONE bucket. Cloudflare sends the real address in {@code CF-Connecting-IP}; Traefik
+     * replaces {@code X-Forwarded-For}, so that one is no use here.
+     *
+     * <p>Trust: the header is only believable because the service is reachable solely through
+     * the tunnel (no public port). If that ever changes, set
+     * {@code athar.ratelimit.client-ip-header} to an empty value.
+     *
+     * <p>The value ends up in a Redis key, so it must be a single, valid IP literal — anything
+     * else (a list, text, an oversized string) is ignored and the connection address is used.
+     */
+    private String clientIp(HttpServletRequest request) {
+        if (!clientIpHeader.isEmpty()) {
+            String value = request.getHeader(clientIpHeader);
+            if (value != null) {
+                String candidate = value.trim();
+                if (candidate.length() <= 45 && candidate.matches("[0-9a-fA-F:.]+")) {
+                    try {
+                        // ofLiteral parses a literal only — it never does a DNS lookup.
+                        return InetAddress.ofLiteral(candidate).getHostAddress();
+                    } catch (IllegalArgumentException ignored) {
+                        // not an IP literal -> fall through
+                    }
+                }
+            }
+        }
+        return request.getRemoteAddr();
     }
 
     @Override
@@ -56,7 +91,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 String apiKey = request.getHeader(API_KEY_HEADER);
                 boolean keyed = apiKey != null && !apiKey.isBlank()
                     && Boolean.TRUE.equals(redis.hasKey(ApiKeyKeys.hash(apiKey)));
-                String identity = keyed ? "key:" + apiKey : "ip:" + request.getRemoteAddr();
+                String identity = keyed ? "key:" + apiKey : "ip:" + clientIp(request);
                 long limit = keyed ? keyedLimit : anonymousLimit;
 
                 long windowMillis = windowSeconds * 1000L;

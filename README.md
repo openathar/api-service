@@ -167,9 +167,19 @@ Athar never 401s a free API over a typo'd header.
   anonymous requests or by API key (`X-API-Key` header) for a higher quota
   (`athar.ratelimit.enabled/limit/keyed-limit/window-seconds`,
   env-overridable via `RATELIMIT_*`; defaults: 60/min anonymous, 600/min
-  keyed). Over the limit → `429` with a `Retry-After` header. Fails open
-  when Redis is unreachable — the API never takes itself down because of
-  the limiter.
+  keyed). Every answer carries `X-RateLimit-Limit` / `X-RateLimit-Remaining`
+  (exposed through CORS); over the limit → `429` with a `Retry-After` header.
+  Fails open when Redis is unreachable — the API never takes itself down
+  because of the limiter.
+- **Client address behind the tunnel:** in production every request arrives
+  from the proxy's LAN address, so `getRemoteAddr()` is the same for all
+  visitors. The limiter therefore keys on `CF-Connecting-IP` (set by
+  Cloudflare; `athar.ratelimit.client-ip-header` / `RATELIMIT_CLIENT_IP_HEADER`,
+  empty = connection address). Only valid IP literals are accepted. This is
+  safe only because the service is reachable solely through the Cloudflare
+  tunnel — **if you ever expose it directly, set the property to empty**, or
+  clients can pick their own bucket. (Before 2026-11-16 all anonymous
+  visitors shared a single 60/min bucket.)
 - **Caching:** calculation results for a given input are deterministic and
   valid forever, so successful calculation responses carry
   `Cache-Control: public, max-age=31536000, immutable`. Exceptions, because
