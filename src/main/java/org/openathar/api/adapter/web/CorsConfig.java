@@ -28,6 +28,9 @@ public class CorsConfig implements WebMvcConfigurer {
             .allowedOrigins(allowedOrigins)
             .allowedMethods("GET", "POST")
             .allowedHeaders("Content-Type", "X-API-Key")
+            // Without this the browser hides the quota headers from JavaScript
+            // (the developer portal's playground and any web client).
+            .exposedHeaders("X-RateLimit-Limit", "X-RateLimit-Remaining", "Retry-After")
             .maxAge(3600);
     }
 }

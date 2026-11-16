@@ -41,6 +41,8 @@ class RateLimitFilterTest {
         assertEquals(200, response.getStatus());
         assertEquals(request, chain.getRequest());
         verify(redis).expire(anyString(), any(Duration.class));
+        assertEquals("60", response.getHeader("X-RateLimit-Limit"));
+        assertEquals("59", response.getHeader("X-RateLimit-Remaining"));
     }
 
     @Test
@@ -54,6 +56,8 @@ class RateLimitFilterTest {
 
         assertEquals(429, response.getStatus());
         assertEquals("60", response.getHeader("Retry-After"));
+        assertEquals("60", response.getHeader("X-RateLimit-Limit"));
+        assertEquals("0", response.getHeader("X-RateLimit-Remaining"));
         assertNull(chain.getRequest());
     }
 
@@ -122,6 +126,8 @@ class RateLimitFilterTest {
         filter(true, 60, 60).doFilter(request, response, chain);
 
         assertEquals(200, response.getStatus());
+        assertEquals("600", response.getHeader("X-RateLimit-Limit"));
+        assertEquals("100", response.getHeader("X-RateLimit-Remaining"));
         verify(ops).increment("athar:apikey:usage:ath_valid");
     }
 }

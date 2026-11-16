@@ -1,0 +1,26 @@
+name: ci
+
+# Quality gate: every PR (and every push to main) runs the full test suite,
+# including the ArchUnit hexagonal rules. The image build (build.yml) only
+# runs on main; without this a broken change was only caught after merging.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - run: mvn -B verify
